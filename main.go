@@ -69,13 +69,11 @@ func (b Bucket) ToSlice() []string {
 	s = append(s, strings.TrimSpace(b.Resp_code_3xx))
 	s = append(s, strings.TrimSpace(b.Resp_code_4xx))
 	s = append(s, strings.TrimSpace(b.Resp_code_5xx))
-
 	return s
 }
 
 func handler(conn net.Conn) {
 	defer conn.Close()
-
 	scanner := bufio.NewScanner(conn)
 	split := func(data []byte, atEOF bool) (int, []byte, error) {
 		if atEOF && len(data) == 0 {
@@ -156,7 +154,8 @@ func handler(conn net.Conn) {
 				}
 
 				// Flush and close for every bucket to allow
-				// other processes to read updated data in					// between writes.
+				// other processes to read updated data in
+				// between writes.
 				writer.Flush()
 				gp.Close()
 				fp.Close()
@@ -165,6 +164,7 @@ func handler(conn net.Conn) {
 	}
 }
 
+// Check if a string exists in slice of strings
 func contains(s []string, e string) bool {
 	for _, a := range s {
 		if a == e {
