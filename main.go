@@ -1,31 +1,28 @@
 package main
 
 import (
-	"bufio"
-	"bytes"
 	"os"
-	"net/url"
-	"path/filepath"
-	//"net/url"
-	"time"
-	"compress/gzip"
-	"encoding/json"
-	"flag"
-	"strings"
-	"fmt"
-	//"github.com/varnish/vcs-streamer/output"
-	"encoding/csv"
 	"log"
 	"net"
+	"fmt"
+	"flag"
+	"time"
+	"bufio"
+	"bytes"
+	"strings"
 	"strconv"
+	"net/url"
+	"path/filepath"
+	"compress/gzip"
+	"encoding/json"
+	"encoding/csv"
 )
 
 var (
 	hostFlag = flag.String("listen-host", "127.0.0.1", "Listen host")
 	portFlag = flag.Int("listen-port", 6556, "Listen port")
 	keysFlag = flag.String("keys", "ALL", "VCS keys to include")
-	dirFlag = flag.String("directory", "/var/lib/vcs2csv/", "Directory to store CSV files")
-
+	dirFlag  = flag.String("directory", "/var/lib/vcs2csv/", "Directory to store CSV files")
 )
 
 type Bucket struct {
@@ -136,8 +133,8 @@ func handler(conn net.Conn) {
 
 			// Unmarshal JSON from VCS into the Entry struct
 			if err := json.Unmarshal(entry, &e); err != nil {
-				log.Printf("Invalid data: %s\n", entry)
-				log.Fatalf("Decode error: %s\n", err)
+				log.Printf("Ignoring unparseable input data.")
+				continue
 			}
 
 			// Skip keys that we are not looking for
@@ -157,7 +154,8 @@ func handler(conn net.Conn) {
 				// Use the timestamp for the filename
 				secs, err := strconv.ParseInt(b.Timestamp, 10, 64)
 				if err != nil {
-				    log.Fatal(err)
+					log.Println(err)
+					continue
 				}
 				ts := time.Unix(secs, 0)
 
@@ -194,14 +192,13 @@ func handler(conn net.Conn) {
 }
 
 func contains(s []string, e string) bool {
-    for _, a := range s {
-        if a == e {
-            return true
-        }
-    }
-    return false
+	for _, a := range s {
+		if a == e {
+			return true
+		}
+	}
+	return false
 }
-
 
 func main() {
 	flag.Parse()
