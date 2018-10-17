@@ -73,32 +73,6 @@ func (b Bucket) ToSlice() []string {
 	return s
 }
 
-//func (b Bucket) ToSlice() [][]string {
-//	var s []string
-//	s = append(s, b.Timestamp)
-//	s = append(s, b.N_requests)
-//	s = append(s, b.N_req_uniq)
-//	s = append(s, b.N_misses)
-//	s = append(s, b.N_restarts)
-//	s = append(s, b.Ttfb_miss)
-//	s = append(s, b.Ttfb_hit)
-//	s = append(s, b.N_bodybytes)
-//	s = append(s, b.Respbytes)
-//	s = append(s, b.Reqbytes)
-//	s = append(s, b.Bereqbytes)
-//	s = append(s, b.Berespbytes)
-//	s = append(s, b.Resp_code_1xx)
-//	s = append(s, b.Resp_code_2xx)
-//	s = append(s, b.Resp_code_3xx)
-//	s = append(s, b.Resp_code_4xx)
-//	s = append(s, b.Resp_code_5xx)
-//
-//	var o [][]string
-//	o = append(o, s)
-//
-//	return o
-//}
-
 func handler(conn net.Conn) {
 	defer conn.Close()
 
