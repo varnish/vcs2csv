@@ -8,6 +8,15 @@
 go get github.com/varnish/vcs2csv
 ```
 
+The binary will be installed to ``$GOPATH/bin/vcs2csv``.
+
+### Cross compile to Linux
+
+```bash
+cd $GOPATH/src/github/varnish/vcs2csv
+GOOS=linux GOARCH=amd64 go build
+```
+
 ## Usage
 
 The process is started with some arguments. The arguments are used to specify host, port, VCS keys to include (whitespace separated list of strings) and the output directory where the CSV files will be stored. In the following example, defaults are used:
