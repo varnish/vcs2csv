@@ -1,21 +1,21 @@
 package main
 
 import (
-	"os"
-	"log"
-	"net"
-	"fmt"
-	"flag"
-	"time"
 	"bufio"
 	"bytes"
-	"strings"
-	"strconv"
-	"net/url"
-	"path/filepath"
 	"compress/gzip"
-	"encoding/json"
 	"encoding/csv"
+	"encoding/json"
+	"flag"
+	"fmt"
+	"log"
+	"net"
+	"net/url"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
 )
 
 var (
