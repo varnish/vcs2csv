@@ -24,7 +24,7 @@ var (
 	hostFlag = flag.String("listen-host", "127.0.0.1", "Listen host")
 	portFlag = flag.Int("listen-port", 6556, "Listen port")
 	keysFlag = flag.String("keys", "ALL", "VCS keys to include")
-	dirFlag = flag.String("directory", "/var/lib/vcs/", "Directory to store CSV files")
+	dirFlag = flag.String("directory", "/var/lib/vcs2csv/", "Directory to store CSV files")
 
 )
 
