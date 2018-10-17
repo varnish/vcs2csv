@@ -1,0 +1,17 @@
+# Example systemd service file.
+
+[Unit]
+Description=vcs2csv is a small program to persist VCS buckets to compressed csv files.
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/vcs2csv --listen-host 127.0.0.1 --listen-port 6556 --keys "ALL" --directory /var/lib/vcs2csv/
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=vcs2csv
+PrivateTmp=true
+User=vcs2csv
+Group=vcs2csv
+
+[Install]
+WantedBy=multi-user.target
