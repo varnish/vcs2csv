@@ -26,28 +26,28 @@ var (
 )
 
 type Bucket struct {
-	Timestamp     string `json:"timestamp,omitempty"`
-	N_requests    string `json:"n_requests,omitempty"`
-	N_req_uniq    string `json:"n_req_uniq,omitempty"`
-	N_misses      string `json:"n_misses,omitempty"`
-	N_restarts    string `json:"n_restarts,omitempty"`
-	Ttfb_miss     string `json:"ttfb_miss,omitempty"`
-	Ttfb_hit      string `json:"ttfb_hit,omitempty"`
-	N_bodybytes   string `json:"n_bodybytes,omitempty"`
-	Respbytes     string `json:"respbytes,omitempty"`
-	Reqbytes      string `json:"reqbytes,omitempty"`
-	Bereqbytes    string `json:"bereqbytes,omitempty"`
-	Berespbytes   string `json:"berespbytes,omitempty"`
-	Resp_code_1xx string `json:"resp_code_1xx,omitempty"`
-	Resp_code_2xx string `json:"resp_code_2xx,omitempty"`
-	Resp_code_3xx string `json:"resp_code_3xx,omitempty"`
-	Resp_code_4xx string `json:"resp_code_4xx,omitempty"`
-	Resp_code_5xx string `json:"resp_code_5xx,omitempty"`
+	Timestamp     string `json:"timestamp"`
+	N_requests    string `json:"n_requests"`
+	N_req_uniq    string `json:"n_req_uniq"`
+	N_misses      string `json:"n_misses"`
+	N_restarts    string `json:"n_restarts"`
+	Ttfb_miss     string `json:"ttfb_miss"`
+	Ttfb_hit      string `json:"ttfb_hit"`
+	N_bodybytes   string `json:"n_bodybytes"`
+	Respbytes     string `json:"respbytes"`
+	Reqbytes      string `json:"reqbytes"`
+	Bereqbytes    string `json:"bereqbytes"`
+	Berespbytes   string `json:"berespbytes"`
+	Resp_code_1xx string `json:"resp_code_1xx"`
+	Resp_code_2xx string `json:"resp_code_2xx"`
+	Resp_code_3xx string `json:"resp_code_3xx"`
+	Resp_code_4xx string `json:"resp_code_4xx"`
+	Resp_code_5xx string `json:"resp_code_5xx"`
 }
 
 type Entry struct {
-	Key     string   `json:"key,omitempty"`
-	Buckets []Bucket `json:"buckets,omitempty"`
+	Key     string   `json:"key"`
+	Buckets []Bucket `json:"buckets"`
 }
 
 func (b Bucket) ToSlice() []string {
