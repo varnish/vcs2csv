@@ -32,3 +32,24 @@ vcs -O 127.0.0.1:6556
 ```
 
 Buckets will be written to ``/var/lib/vcs2csv/YYYY-MM-DD-key.csv.gz``. The *key* will be url encoded.
+
+## CSV format
+
+* Column  0: ``timestamp`` (int, epoch),
+* Column  1: ``n_requests`` (int),
+* Column  2: ``n_req_uniq`` (int),
+* Column  3: ``n_misses`` (int),
+* Column  4: ``n_restarts`` (int),
+* Column  5: ``ttfb_miss`` (float),
+* Column  6: ``ttfb_hit`` (float),
+* Column  7: ``n_bodybytes`` (int),
+* Column  8: ``respbytes`` (int),
+* Column  9: ``reqbytes`` (int),
+* Column 10: ``bereqbytes`` (int),
+* Column 11: ``berespbytes`` (int),
+* Column 12: ``resp_code_1xx`` (int),
+* Column 13: ``resp_code_2xx`` (int),
+* Column 14: ``resp_code_3xx`` (int),
+* Column 15: ``resp_code_4xx`` (int),
+* Column 16: ``resp_code_5xx`` (int)
+
