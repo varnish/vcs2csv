@@ -3,27 +3,33 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"compress/gzip"
-	"encoding/csv"
 	"encoding/json"
 	"flag"
 	"fmt"
-	"log"
 	"net"
-	"net/url"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
+
+	"github.com/varnish/go-pkgs/logger"
 )
 
 var (
-	hostFlag = flag.String("listen-host", "127.0.0.1", "Listen host")
-	portFlag = flag.Int("listen-port", 6556, "Listen port")
-	keysFlag = flag.String("keys", "ALL", "VCS keys to include")
-	dirFlag  = flag.String("directory", "/var/lib/vcs2csv/", "Directory to store CSV files")
+	hostFlag    = flag.String("listen-host", "127.0.0.1", "Listen host")
+	portFlag    = flag.Int("listen-port", 6556, "Listen port")
+	keysFlag    = flag.String("keys", "ALL", "VCS keys to include")
+	dirFlag     = flag.String("directory", "/var/lib/vcs2csv/", "Directory to store CSV files")
+	logLevel    = flag.String("log", "INFO", "Log level [DEBUG, INFO, WARNING, ERROR, QUIET]")
+	carbonHost  = flag.String("carbon-host", "", "Carbon Host")
+	carbonPort  = flag.Int("carbon-port", 2003, "Carbon Port")
+	carbonProto = flag.String("carbon-proto", "tcp", "Carbon protocl [udp|tcp]")
+	carbonPath  = flag.String("carbon-path", "vcs2csv", "Carbon path built vcs.<carbon-path>.bucket.metric")
 )
+
+// VCS2Anyer is the interface that all outputers need to implement
+type VCS2Anyer interface {
+	HandleEntry(chan *Entry, chan bool)
+}
 
 type Bucket struct {
 	Timestamp     string `json:"timestamp"`
@@ -50,6 +56,7 @@ type Entry struct {
 	Buckets []Bucket `json:"buckets"`
 }
 
+// ToSlice returns bucket keys as a slice of strings
 func (b Bucket) ToSlice() []string {
 	var s []string
 	s = append(s, strings.TrimSpace(b.Timestamp))
@@ -72,8 +79,39 @@ func (b Bucket) ToSlice() []string {
 	return s
 }
 
-func handler(conn net.Conn) {
+// ToMap return bucket names as keys with values
+func (b Bucket) ToMap() map[string]string {
+	m := make(map[string]string)
+	m["timestamp"] = b.Timestamp
+	m["n_requests"] = b.N_requests
+	m["n_req_uniq"] = b.N_req_uniq
+	m["n_misses"] = b.N_misses
+	m["n_restarts"] = b.N_restarts
+	m["ttfb_miss"] = b.Ttfb_miss
+	m["ttfb_hit"] = b.Ttfb_hit
+	m["n_bodybytes"] = b.N_bodybytes
+	m["respbytes"] = b.Respbytes
+	m["reqbytes"] = b.Reqbytes
+	m["bereqbytes"] = b.Bereqbytes
+	m["berespbytes"] = b.Berespbytes
+	m["resp_code_1xx"] = b.Resp_code_1xx
+	m["resp_code_2xx"] = b.Resp_code_2xx
+	m["resp_code_3xx"] = b.Resp_code_3xx
+	m["resp_code_4xx"] = b.Resp_code_4xx
+	m["resp_code_5xx"] = b.Resp_code_5xx
+	return m
+}
+
+// vcsConHandler handles incoming connections and fires of an
+// VCS2Anyer to handle the incoming data.
+func vcsConHandler(conn net.Conn, vany VCS2Anyer) {
+	// Channel to read/write Entry to
+	entryChan := make(chan *Entry)
+	doneChan := make(chan bool)
+	defer close(entryChan)
+	defer close(doneChan)
 	defer conn.Close()
+
 	scanner := bufio.NewScanner(conn)
 	split := func(data []byte, atEOF bool) (int, []byte, error) {
 		if atEOF && len(data) == 0 {
@@ -92,76 +130,44 @@ func handler(conn net.Conn) {
 	}
 	scanner.Split(split)
 
-	for {
-		// Set the split function for the scanning operation.
-		if scanner.Scan() {
-			entry := scanner.Bytes()
-			//log.Println("New event")
+	// Start our Vcs2anyer to handle the Entry
+	go vany.HandleEntry(entryChan, doneChan)
 
-			// Remove the first line of the entry, that
-			// contains the number of bytes to read.
-			e := Entry{}
-			entry = entry[bytes.IndexByte(entry, '\n'):]
+	// Set the split function for the scanning operation.
+	for scanner.Scan() {
+		entry := scanner.Bytes()
+		//log.Println("New event")
 
-			// Unmarshal JSON from VCS into the Entry struct
-			if err := json.Unmarshal(entry, &e); err != nil {
-				log.Printf("Ignoring unparseable input data.")
-				continue
-			}
-
-			// Skip keys that we are not looking for
-			exists := contains(strings.Split(*keysFlag, " "), e.Key)
-			if !exists {
-				continue
-			}
-
-			// We may receive multiple buckets for the same key at
-			// the same time. For example if we've had connection
-			// problems and VCS buffered the data in between.
-			for _, b := range e.Buckets {
-				// Create a slice that will later be written
-				// to file for this bucket
-				out := b.ToSlice()
-
-				// Use the timestamp for the filename
-				secs, err := strconv.ParseInt(b.Timestamp, 10, 64)
-				if err != nil {
-					log.Println(err)
-					continue
-				}
-				ts := time.Unix(secs, 0)
-
-				// Urlencode the key to make the filename safe
-				encodedKey := url.QueryEscape(e.Key)
-
-				// Generate path to file
-				filename := fmt.Sprintf("%s-%s.csv.gz", ts.Format("2006-01-02"), encodedKey)
-				path := filepath.Join(*dirFlag, filename)
-
-				// Create the file if it does not exist and
-				// append if it exists. This is done per bucket
-				// in order to ensure that wewrite to the
-				// correct file when flipping between dates.
-				fp, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
-				if err != nil {
-					log.Fatal(err)
-				}
-
-				gp := gzip.NewWriter(fp)
-				writer := csv.NewWriter(gp)
-				if err := writer.Write(out); err != nil {
-					log.Fatal(err)
-				}
-
-				// Flush and close for every bucket to allow
-				// other processes to read updated data in
-				// between writes.
-				writer.Flush()
-				gp.Close()
-				fp.Close()
-			}
+		// Remove the first line of the entry, that
+		// contains the number of bytes to read.
+		e := Entry{}
+		idx := bytes.IndexByte(entry, '\n')
+		// If we fail to indexbyte we will panic, so check for -1
+		// if there is no \n and continue.
+		if idx == -1 {
+			logger.Info("invalid data recieved")
+			continue
 		}
+		// If idx is -1 this will panic
+		entry = entry[idx:]
+
+		// Unmarshal JSON from VCS into the Entry struct
+		if err := json.Unmarshal(entry, &e); err != nil {
+			logger.Info("Ignoring unparseable input data.")
+			continue
+		}
+
+		// Skip keys that we are not looking for
+		exists := contains(strings.Split(*keysFlag, " "), e.Key)
+		if !exists {
+			continue
+		}
+		// Send the entry to the handler
+		entryChan <- &e
 	}
+	// We are done, make sure handlers quit
+	logger.Debug("Connection ended")
+	doneChan <- true
 }
 
 // Check if a string exists in slice of strings
@@ -174,23 +180,63 @@ func contains(s []string, e string) bool {
 	return false
 }
 
+// getLogLevel returns integer representation of log level
+func getLogLevel(level string) int {
+	var selectedLevel = logger.INFO_LEVEL
+
+	if strings.EqualFold("debug", level) {
+		selectedLevel = logger.DEBUG_LEVEL
+	} else if strings.EqualFold("warning", level) {
+		selectedLevel = logger.WARNING_LEVEL
+	} else if strings.EqualFold("error", level) {
+		selectedLevel = logger.ERROR_LEVEL
+	} else if strings.EqualFold("quiet", level) {
+		selectedLevel = logger.DISABLED
+	}
+
+	return selectedLevel
+}
+
 func main() {
 	flag.Parse()
+	var daemonLogLevel = getLogLevel(*logLevel)
+	logger.InitNewLogger(os.Stdout, daemonLogLevel)
 
 	l, err := net.Listen("tcp", *hostFlag+":"+strconv.Itoa(*portFlag))
 	if err != nil {
-		log.Fatal(err)
+		logger.ErrorSync(err.Error())
+		os.Exit(-1)
 	}
 	defer l.Close()
+
+	logger.Info(fmt.Sprintf("Startinv vcs2any, listening on %s:%d for incomming vcs data", *hostFlag, *portFlag))
+
+	var anyer VCS2Anyer
+
+	// Choose VCSAnyer based on flags.
+	if *carbonHost != "" {
+		logger.Info("Using Carbon/Graphite for storing metrics")
+		anyer = &VCS2Graphite{}
+	} else {
+		logger.Info("Using CSV for storing metrics")
+		anyer = &VCS2csv{}
+	}
+
 	for {
 		// Wait for a connection.
 		conn, err := l.Accept()
 		if err != nil {
-			log.Fatal(err)
+			logger.ErrorSync(err.Error())
+			os.Exit(-1)
 		}
+
 		// Handle the connection in a new goroutine.
 		// The loop then returns to accepting, so that
 		// multiple connections may be served concurrently.
-		go handler(conn)
+		logger.Info(fmt.Sprintf("New connection from: %s", conn.RemoteAddr()))
+
+		// Fire off our handler for this connection, will use
+		// VCSAnyer to send the metrics.
+		go vcsConHandler(conn, anyer)
 	}
 }
