@@ -92,74 +92,72 @@ func handler(conn net.Conn) {
 	}
 	scanner.Split(split)
 
-	for {
+	for scanner.Scan() {
 		// Set the split function for the scanning operation.
-		if scanner.Scan() {
-			entry := scanner.Bytes()
-			//log.Println("New event")
+		entry := scanner.Bytes()
+		//log.Println("New event")
 
-			// Remove the first line of the entry, that
-			// contains the number of bytes to read.
-			e := Entry{}
-			entry = entry[bytes.IndexByte(entry, '\n'):]
+		// Remove the first line of the entry, that
+		// contains the number of bytes to read.
+		e := Entry{}
+		entry = entry[bytes.IndexByte(entry, '\n'):]
 
-			// Unmarshal JSON from VCS into the Entry struct
-			if err := json.Unmarshal(entry, &e); err != nil {
-				log.Printf("Ignoring unparseable input data.")
+		// Unmarshal JSON from VCS into the Entry struct
+		if err := json.Unmarshal(entry, &e); err != nil {
+			log.Printf("Ignoring unparseable input data.")
+			continue
+		}
+
+		// Skip keys that we are not looking for
+		exists := contains(strings.Split(*keysFlag, " "), e.Key)
+		if !exists {
+			continue
+		}
+
+		// We may receive multiple buckets for the same key at
+		// the same time. For example if we've had connection
+		// problems and VCS buffered the data in between.
+		for _, b := range e.Buckets {
+			// Create a slice that will later be written
+			// to file for this bucket
+			out := b.ToSlice()
+
+			// Use the timestamp for the filename
+			secs, err := strconv.ParseInt(b.Timestamp, 10, 64)
+			if err != nil {
+				log.Println(err)
 				continue
 			}
+			ts := time.Unix(secs, 0)
 
-			// Skip keys that we are not looking for
-			exists := contains(strings.Split(*keysFlag, " "), e.Key)
-			if !exists {
-				continue
+			// Urlencode the key to make the filename safe
+			encodedKey := url.QueryEscape(e.Key)
+
+			// Generate path to file
+			filename := fmt.Sprintf("%s-%s.csv.gz", ts.Format("2006-01-02"), encodedKey)
+			path := filepath.Join(*dirFlag, filename)
+
+			// Create the file if it does not exist and
+			// append if it exists. This is done per bucket
+			// in order to ensure that wewrite to the
+			// correct file when flipping between dates.
+			fp, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+			if err != nil {
+				log.Fatal(err)
 			}
 
-			// We may receive multiple buckets for the same key at
-			// the same time. For example if we've had connection
-			// problems and VCS buffered the data in between.
-			for _, b := range e.Buckets {
-				// Create a slice that will later be written
-				// to file for this bucket
-				out := b.ToSlice()
-
-				// Use the timestamp for the filename
-				secs, err := strconv.ParseInt(b.Timestamp, 10, 64)
-				if err != nil {
-					log.Println(err)
-					continue
-				}
-				ts := time.Unix(secs, 0)
-
-				// Urlencode the key to make the filename safe
-				encodedKey := url.QueryEscape(e.Key)
-
-				// Generate path to file
-				filename := fmt.Sprintf("%s-%s.csv.gz", ts.Format("2006-01-02"), encodedKey)
-				path := filepath.Join(*dirFlag, filename)
-
-				// Create the file if it does not exist and
-				// append if it exists. This is done per bucket
-				// in order to ensure that wewrite to the
-				// correct file when flipping between dates.
-				fp, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
-				if err != nil {
-					log.Fatal(err)
-				}
-
-				gp := gzip.NewWriter(fp)
-				writer := csv.NewWriter(gp)
-				if err := writer.Write(out); err != nil {
-					log.Fatal(err)
-				}
-
-				// Flush and close for every bucket to allow
-				// other processes to read updated data in
-				// between writes.
-				writer.Flush()
-				gp.Close()
-				fp.Close()
+			gp := gzip.NewWriter(fp)
+			writer := csv.NewWriter(gp)
+			if err := writer.Write(out); err != nil {
+				log.Fatal(err)
 			}
+
+			// Flush and close for every bucket to allow
+			// other processes to read updated data in
+			// between writes.
+			writer.Flush()
+			gp.Close()
+			fp.Close()
 		}
 	}
 }
