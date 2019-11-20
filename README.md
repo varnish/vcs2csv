@@ -33,6 +33,12 @@ vcs -O 127.0.0.1:6556
 
 Buckets will be written to ``/var/lib/vcs2csv/YYYY-MM-DD-key.csv.gz``. The *key* will be url encoded.
 
+The following is an example with regular expression matching on the keys:
+
+```bash
+vcs2csv --listen-host 127.0.0.1 --listen-port 6556 --key-patterns "^COUNTRY/.* ^METRICS" --directory /var/lib/vcs2csv/
+```
+
 ## CSV format
 
 * Column  0: ``timestamp`` (int, epoch),

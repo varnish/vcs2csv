@@ -16,12 +16,14 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"regexp"
 )
 
 var (
 	hostFlag = flag.String("listen-host", "127.0.0.1", "Listen host")
 	portFlag = flag.Int("listen-port", 6556, "Listen port")
-	keysFlag = flag.String("keys", "ALL", "VCS keys to include")
+	keysFlag = flag.String("keys", "ALL", "VCS keys to include, separated by whitespace")
+	keyPatternsFlag = flag.String("key-patterns", "", "Regex pattern of VCS keys to include, separated by whitespace")
 	dirFlag  = flag.String("directory", "/var/lib/vcs2csv/", "Directory to store CSV files")
 )
 
@@ -108,9 +110,15 @@ func handler(conn net.Conn) {
 			continue
 		}
 
-		// Skip keys that we are not looking for
-		exists := contains(strings.Split(*keysFlag, " "), e.Key)
-		if !exists {
+		// Key matching
+		if contains(strings.Split(*keysFlag, " "), e.Key) {
+			// String comparison
+			log.Println("Matched key " + e.Key + " (strcmp)");
+		} else if patternMatch(strings.Split(*keyPatternsFlag, " "), e.Key) {
+			// Regular expression matching
+			log.Println("Matched key " + e.Key + " (regexp)");
+		} else {
+			// Skip this key if it's not a match
 			continue
 		}
 
@@ -168,6 +176,22 @@ func contains(s []string, e string) bool {
 		if a == e {
 			return true
 		}
+	}
+	return false
+}
+
+func patternMatch(s []string, e string) bool {
+	var matched bool
+	var err error
+	for _, pattern := range s {
+		matched, err = regexp.MatchString(pattern, e)
+		if err != nil {
+			log.Fatal("Regular expression problem: " + err.Error())
+		}
+		if matched {
+			return true
+		}
+		matched = false
 	}
 	return false
 }
