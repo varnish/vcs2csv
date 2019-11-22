@@ -20,6 +20,7 @@ import (
 )
 
 var (
+	debugFlag = flag.Bool("debug", false, "Enable debug logging")
 	hostFlag = flag.String("listen-host", "127.0.0.1", "Listen host")
 	portFlag = flag.Int("listen-port", 6556, "Listen port")
 	keysFlag = flag.String("keys", "ALL", "VCS keys to include, separated by whitespace")
@@ -113,12 +114,19 @@ func handler(conn net.Conn) {
 		// Key matching
 		if contains(strings.Split(*keysFlag, " "), e.Key) {
 			// String comparison
-			log.Println("Matched key " + e.Key + " (strcmp)");
+			if *debugFlag {
+				log.Println("Matched VCS key " + e.Key + " (String match)");
+			}
 		} else if patternMatch(strings.Split(*keyPatternsFlag, " "), e.Key) {
 			// Regular expression matching
-			log.Println("Matched key " + e.Key + " (regexp)");
+			if *debugFlag {
+				log.Println("Matched VCS key " + e.Key + " (Regexp match)");
+			}
 		} else {
 			// Skip this key if it's not a match
+			if *debugFlag {
+				log.Println("Ignored VCS key " + e.Key + " (No match)");
+			}
 			continue
 		}
 
